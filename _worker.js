@@ -76,6 +76,17 @@ function safeDecodeURIComponent(value) {
     }
 }
 
+function uniqueProxyName(rawName, usedNames) {
+    const baseName = String(rawName || '节点').trim() || '节点';
+    const count = (usedNames.get(baseName) || 0) + 1;
+    usedNames.set(baseName, count);
+    return count === 1 ? baseName : `${baseName}-${count}`;
+}
+
+function yamlSingleQuote(value) {
+    return `'${String(value).replace(/'/g, "''")}'`;
+}
+
 function utf8ToBase64(str) {
     if (typeof TextEncoder !== 'undefined') {
         const bytes = new TextEncoder().encode(str);
@@ -742,8 +753,9 @@ function generateClashConfig(links) {
     yaml += 'proxies:\n';
     
     const proxyNames = [];
+    const usedNames = new Map();
     links.forEach((link, index) => {
-        const name = safeDecodeURIComponent(link.split('#')[1] || `节点${index + 1}`);
+        const name = uniqueProxyName(safeDecodeURIComponent(link.split('#')[1] || `节点${index + 1}`), usedNames);
         proxyNames.push(name);
         const server = link.match(/@([^:]+):(\d+)/)?.[1] || '';
         const port = link.match(/@[^:]+:(\d+)/)?.[1] || '443';
@@ -755,7 +767,7 @@ function generateClashConfig(links) {
         const echParam = link.match(/[?&]ech=([^&#]+)/)?.[1];
         const echDomain = echParam ? safeDecodeURIComponent(echParam).split('+')[0] : '';
         
-        yaml += `  - name: ${name}\n`;
+        yaml += `  - name: ${yamlSingleQuote(name)}\n`;
         yaml += `    type: vless\n`;
         yaml += `    server: ${server}\n`;
         yaml += `    port: ${port}\n`;
@@ -779,7 +791,7 @@ function generateClashConfig(links) {
     yaml += '\nproxy-groups:\n';
     yaml += '  - name: PROXY\n';
     yaml += '    type: select\n';
-    yaml += `    proxies: [${proxyNames.map(n => `'${n}'`).join(', ')}]\n`;
+    yaml += `    proxies: [${proxyNames.map(yamlSingleQuote).join(', ')}]\n`;
     yaml += '\nrules:\n';
     yaml += '  - DOMAIN-SUFFIX,local,DIRECT\n';
     yaml += '  - IP-CIDR,127.0.0.0/8,DIRECT\n';
@@ -792,11 +804,14 @@ function generateClashConfig(links) {
 // 生成Surge配置
 function generateSurgeConfig(links) {
     let config = '[Proxy]\n';
+    const proxyNames = [];
+    const usedNames = new Map();
     links.forEach(link => {
-        const name = safeDecodeURIComponent(link.split('#')[1] || '节点');
+        const name = uniqueProxyName(safeDecodeURIComponent(link.split('#')[1] || '节点'), usedNames);
+        proxyNames.push(name);
         config += `${name} = vless, ${link.match(/@([^:]+):(\d+)/)?.[1] || ''}, ${link.match(/@[^:]+:(\d+)/)?.[1] || '443'}, username=${link.match(/vless:\/\/([^@]+)@/)?.[1] || ''}, tls=${link.includes('security=tls')}, ws=true, ws-path=${link.match(/path=([^&#]+)/)?.[1] || '/'}, ws-headers=Host:${link.match(/host=([^&#]+)/)?.[1] || ''}\n`;
     });
-    config += '\n[Proxy Group]\nPROXY = select, ' + links.map((_, i) => safeDecodeURIComponent(links[i].split('#')[1] || `节点${i + 1}`)).join(', ') + '\n';
+    config += '\n[Proxy Group]\nPROXY = select, ' + proxyNames.join(', ') + '\n';
     return config;
 }
 
