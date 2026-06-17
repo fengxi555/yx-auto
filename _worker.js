@@ -46,29 +46,7 @@ function getConfigValue(key, defaultValue) {
     return defaultValue || '';
 }
 
-function readableParamValue(value) {
-    return encodeURIComponent(String(value ?? ''))
-        .replace(/%2F/gi, '/')
-        .replace(/%3A/gi, ':')
-        .replace(/%2C/gi, ',')
-        .replace(/%2B/gi, '+')
-        .replace(/%3F/gi, '?')
-        .replace(/%3D/gi, '=')
-        .replace(/%40/gi, '@')
-        .replace(/%5B/gi, '[')
-        .replace(/%5D/gi, ']');
-}
-
-function plainParamString(params) {
-    const entries = params instanceof URLSearchParams ? Array.from(params.entries()) : Object.entries(params);
-    return entries.map(([key, value]) => `${key}=${readableParamValue(value)}`).join('&');
-}
-
-function plainRemark(name) {
-    return String(name || '').replace(/[\r\n#]+/g, '_');
-}
-
-function safeDecodeURIComponent(value) {
+function safeUrlDecode(value) {
     try {
         return decodeURIComponent(value);
     } catch (e) {
@@ -76,32 +54,11 @@ function safeDecodeURIComponent(value) {
     }
 }
 
-function uniqueProxyName(rawName, usedNames) {
-    const baseName = String(rawName || '节点').trim() || '节点';
-    const count = (usedNames.get(baseName) || 0) + 1;
-    usedNames.set(baseName, count);
-    return count === 1 ? baseName : `${baseName}-${count}`;
-}
-
-function yamlSingleQuote(value) {
-    return `'${String(value).replace(/'/g, "''")}'`;
+function decodeGeneratedLinks(links) {
+    return links.map(link => safeUrlDecode(link));
 }
 
 function utf8ToBase64(str) {
-    if (typeof TextEncoder !== 'undefined') {
-        const bytes = new TextEncoder().encode(str);
-        let binary = '';
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-            const chunk = bytes.subarray(i, i + chunkSize);
-            let part = '';
-            for (let j = 0; j < chunk.length; j++) {
-                part += String.fromCharCode(chunk[j]);
-            }
-            binary += part;
-        }
-        return btoa(binary);
-    }
     return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function toSolidBytes(match, p1) {
         return String.fromCharCode('0x' + p1);
     }));
@@ -369,7 +326,7 @@ function generateLinksFromSource(list, user, workerDomain, disableNonTLS = false
                     wsParams.set('alpn', 'h3,h2,http/1.1');
                     wsParams.set('ech', echConfig);
                 }
-                links.push(`${proto}://${user}@${safeIP}:${port}?${plainParamString(wsParams)}#${plainRemark(wsNodeName)}`);
+                links.push(`${proto}://${user}@${safeIP}:${port}?${wsParams.toString()}#${encodeURIComponent(wsNodeName)}`);
             } else {
                 const wsNodeName = `${nodeNameBase}-${port}-WS`;
                 const wsParams = new URLSearchParams({
@@ -379,7 +336,7 @@ function generateLinksFromSource(list, user, workerDomain, disableNonTLS = false
                     host: workerDomain,
                     path: wsPath
                 });
-                links.push(`${proto}://${user}@${safeIP}:${port}?${plainParamString(wsParams)}#${plainRemark(wsNodeName)}`);
+                links.push(`${proto}://${user}@${safeIP}:${port}?${wsParams.toString()}#${encodeURIComponent(wsNodeName)}`);
             }
         });
     });
@@ -440,7 +397,7 @@ async function generateTrojanLinksFromSource(list, user, workerDomain, disableNo
                     wsParams.set('alpn', 'h3,h2,http/1.1');
                     wsParams.set('ech', echConfig);
                 }
-                links.push(`trojan://${password}@${safeIP}:${port}?${plainParamString(wsParams)}#${plainRemark(wsNodeName)}`);
+                links.push(`trojan://${password}@${safeIP}:${port}?${wsParams.toString()}#${encodeURIComponent(wsNodeName)}`);
             } else {
                 const wsNodeName = `${nodeNameBase}-${port}-Trojan-WS`;
                 const wsParams = new URLSearchParams({
@@ -449,7 +406,7 @@ async function generateTrojanLinksFromSource(list, user, workerDomain, disableNo
                     host: workerDomain,
                     path: wsPath
                 });
-                links.push(`trojan://${password}@${safeIP}:${port}?${plainParamString(wsParams)}#${plainRemark(wsNodeName)}`);
+                links.push(`trojan://${password}@${safeIP}:${port}?${wsParams.toString()}#${encodeURIComponent(wsNodeName)}`);
             }
         });
     });
@@ -534,7 +491,7 @@ function generateLinksFromNewIPs(list, user, workerDomain, customPath = '/', ech
     const links = [];
     const wsPath = customPath || '/';
     const proto = 'vless';
-    const echSuffix = echConfig ? `&alpn=h3,h2,http/1.1&ech=${echConfig}` : '';
+    const echSuffix = echConfig ? `&alpn=h3%2Ch2%2Chttp%2F1.1&ech=${encodeURIComponent(echConfig)}` : '';
     
     list.forEach(item => {
         const nodeName = item.name.replace(/\s/g, '_');
@@ -542,15 +499,15 @@ function generateLinksFromNewIPs(list, user, workerDomain, customPath = '/', ech
         
         if (CF_HTTPS_PORTS.includes(port)) {
             const wsNodeName = `${nodeName}-${port}-WS-TLS`;
-            const link = `${proto}://${user}@${item.ip}:${port}?encryption=none&security=tls&sni=${workerDomain}&fp=chrome&type=ws&host=${workerDomain}&path=${wsPath}${echSuffix}#${plainRemark(wsNodeName)}`;
+            const link = `${proto}://${user}@${item.ip}:${port}?encryption=none&security=tls&sni=${workerDomain}&fp=chrome&type=ws&host=${workerDomain}&path=${wsPath}${echSuffix}#${encodeURIComponent(wsNodeName)}`;
             links.push(link);
         } else if (CF_HTTP_PORTS.includes(port)) {
             const wsNodeName = `${nodeName}-${port}-WS`;
-            const link = `${proto}://${user}@${item.ip}:${port}?encryption=none&security=none&type=ws&host=${workerDomain}&path=${wsPath}#${plainRemark(wsNodeName)}`;
+            const link = `${proto}://${user}@${item.ip}:${port}?encryption=none&security=none&type=ws&host=${workerDomain}&path=${wsPath}#${encodeURIComponent(wsNodeName)}`;
             links.push(link);
         } else {
             const wsNodeName = `${nodeName}-${port}-WS-TLS`;
-            const link = `${proto}://${user}@${item.ip}:${port}?encryption=none&security=tls&sni=${workerDomain}&fp=chrome&type=ws&host=${workerDomain}&path=${wsPath}${echSuffix}#${plainRemark(wsNodeName)}`;
+            const link = `${proto}://${user}@${item.ip}:${port}?encryption=none&security=tls&sni=${workerDomain}&fp=chrome&type=ws&host=${workerDomain}&path=${wsPath}${echSuffix}#${encodeURIComponent(wsNodeName)}`;
             links.push(link);
         }
     });
@@ -708,31 +665,32 @@ async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4E
 
     if (finalLinks.length === 0) {
         const errorRemark = "所有节点获取失败";
-        const errorLink = `vless://00000000-0000-0000-0000-000000000000@127.0.0.1:80?encryption=none&security=none&type=ws&host=error.com&path=/#${plainRemark(errorRemark)}`;
+        const errorLink = `vless://00000000-0000-0000-0000-000000000000@127.0.0.1:80?encryption=none&security=none&type=ws&host=error.com&path=%2F#${encodeURIComponent(errorRemark)}`;
         finalLinks.push(errorLink);
     }
 
+    const outputLinks = decodeGeneratedLinks(finalLinks);
     let subscriptionContent;
     let contentType = 'text/plain; charset=utf-8';
     
     switch (target.toLowerCase()) {
         case 'clash':
         case 'clashr':
-            subscriptionContent = generateClashConfig(finalLinks);
+            subscriptionContent = generateClashConfig(outputLinks);
             contentType = 'text/yaml; charset=utf-8';
             break;
         case 'surge':
         case 'surge2':
         case 'surge3':
         case 'surge4':
-            subscriptionContent = generateSurgeConfig(finalLinks);
+            subscriptionContent = generateSurgeConfig(outputLinks);
             break;
         case 'quantumult':
         case 'quanx':
-            subscriptionContent = generateQuantumultConfig(finalLinks);
+            subscriptionContent = generateQuantumultConfig(outputLinks);
             break;
         default:
-            subscriptionContent = utf8ToBase64(finalLinks.join('\n'));
+            subscriptionContent = utf8ToBase64(outputLinks.join('\n'));
     }
     
     return new Response(subscriptionContent, {
@@ -753,9 +711,8 @@ function generateClashConfig(links) {
     yaml += 'proxies:\n';
     
     const proxyNames = [];
-    const usedNames = new Map();
     links.forEach((link, index) => {
-        const name = uniqueProxyName(safeDecodeURIComponent(link.split('#')[1] || `节点${index + 1}`), usedNames);
+        const name = decodeURIComponent(link.split('#')[1] || `节点${index + 1}`);
         proxyNames.push(name);
         const server = link.match(/@([^:]+):(\d+)/)?.[1] || '';
         const port = link.match(/@[^:]+:(\d+)/)?.[1] || '443';
@@ -765,9 +722,9 @@ function generateClashConfig(links) {
         const host = link.match(/host=([^&#]+)/)?.[1] || '';
         const sni = link.match(/sni=([^&#]+)/)?.[1] || '';
         const echParam = link.match(/[?&]ech=([^&#]+)/)?.[1];
-        const echDomain = echParam ? safeDecodeURIComponent(echParam).split('+')[0] : '';
+        const echDomain = echParam ? decodeURIComponent(echParam).split('+')[0] : '';
         
-        yaml += `  - name: ${yamlSingleQuote(name)}\n`;
+        yaml += `  - name: ${name}\n`;
         yaml += `    type: vless\n`;
         yaml += `    server: ${server}\n`;
         yaml += `    port: ${port}\n`;
@@ -791,7 +748,7 @@ function generateClashConfig(links) {
     yaml += '\nproxy-groups:\n';
     yaml += '  - name: PROXY\n';
     yaml += '    type: select\n';
-    yaml += `    proxies: [${proxyNames.map(yamlSingleQuote).join(', ')}]\n`;
+    yaml += `    proxies: [${proxyNames.map(n => `'${n}'`).join(', ')}]\n`;
     yaml += '\nrules:\n';
     yaml += '  - DOMAIN-SUFFIX,local,DIRECT\n';
     yaml += '  - IP-CIDR,127.0.0.0/8,DIRECT\n';
@@ -804,20 +761,17 @@ function generateClashConfig(links) {
 // 生成Surge配置
 function generateSurgeConfig(links) {
     let config = '[Proxy]\n';
-    const proxyNames = [];
-    const usedNames = new Map();
     links.forEach(link => {
-        const name = uniqueProxyName(safeDecodeURIComponent(link.split('#')[1] || '节点'), usedNames);
-        proxyNames.push(name);
+        const name = decodeURIComponent(link.split('#')[1] || '节点');
         config += `${name} = vless, ${link.match(/@([^:]+):(\d+)/)?.[1] || ''}, ${link.match(/@[^:]+:(\d+)/)?.[1] || '443'}, username=${link.match(/vless:\/\/([^@]+)@/)?.[1] || ''}, tls=${link.includes('security=tls')}, ws=true, ws-path=${link.match(/path=([^&#]+)/)?.[1] || '/'}, ws-headers=Host:${link.match(/host=([^&#]+)/)?.[1] || ''}\n`;
     });
-    config += '\n[Proxy Group]\nPROXY = select, ' + proxyNames.join(', ') + '\n';
+    config += '\n[Proxy Group]\nPROXY = select, ' + links.map((_, i) => decodeURIComponent(links[i].split('#')[1] || `节点${i + 1}`)).join(', ') + '\n';
     return config;
 }
 
 // 生成Quantumult配置
 function generateQuantumultConfig(links) {
-    return utf8ToBase64(links.join('\n'));
+    return btoa(links.join('\n'));
 }
 
 // 生成iOS 26风格的主页
@@ -1455,27 +1409,6 @@ function generateHomePage(scuValue) {
         
         // 订阅转换地址（从服务器注入）
         const SUB_CONVERTER_URL = "${ scu }";
-
-        function readableParamValue(value) {
-            return encodeURIComponent(value)
-                .replace(/%2F/gi, '/')
-                .replace(/%3A/gi, ':')
-                .replace(/%2C/gi, ',')
-                .replace(/%2B/gi, '+')
-                .replace(/%3F/gi, '?')
-                .replace(/%3D/gi, '=')
-                .replace(/%40/gi, '@')
-                .replace(/%5B/gi, '[')
-                .replace(/%5D/gi, ']');
-        }
-
-        function safeDecodeURIComponent(value) {
-            try {
-                return decodeURIComponent(value);
-            } catch (e) {
-                return value;
-            }
-        }
         
         function tryOpenApp(schemeUrl, fallbackCallback, timeout) {
             timeout = timeout || 2500;
@@ -1548,11 +1481,11 @@ function generateHomePage(scuValue) {
             
             const currentUrl = new URL(window.location.href);
             const baseUrl = currentUrl.origin;
-            let subscriptionUrl = \`\${baseUrl}/\${uuid}/sub?domain=\${readableParamValue(domain)}&epd=\${switches.switchDomain ? 'yes' : 'no'}&epi=\${switches.switchIP ? 'yes' : 'no'}&egi=\${switches.switchGitHub ? 'yes' : 'no'}\`;
+            let subscriptionUrl = \`\${baseUrl}/\${uuid}/sub?domain=\${encodeURIComponent(domain)}&epd=\${switches.switchDomain ? 'yes' : 'no'}&epi=\${switches.switchIP ? 'yes' : 'no'}&egi=\${switches.switchGitHub ? 'yes' : 'no'}\`;
             
             // 添加GitHub优选URL
             if (githubUrl) {
-                subscriptionUrl += \`&piu=\${readableParamValue(githubUrl)}\`;
+                subscriptionUrl += \`&piu=\${encodeURIComponent(githubUrl)}\`;
             }
             
             // 添加协议选择
@@ -1571,14 +1504,14 @@ function generateHomePage(scuValue) {
             if (switches.switchECH) {
                 subscriptionUrl += '&ech=yes';
                 const dnsVal = document.getElementById('customDNS') && document.getElementById('customDNS').value.trim();
-                if (dnsVal) subscriptionUrl += \`&customDNS=\${readableParamValue(dnsVal)}\`;
+                if (dnsVal) subscriptionUrl += \`&customDNS=\${encodeURIComponent(dnsVal)}\`;
                 const domainVal = document.getElementById('customECHDomain') && document.getElementById('customECHDomain').value.trim();
-                if (domainVal) subscriptionUrl += \`&customECHDomain=\${readableParamValue(domainVal)}\`;
+                if (domainVal) subscriptionUrl += \`&customECHDomain=\${encodeURIComponent(domainVal)}\`;
             }
             
             // 添加自定义路径
             if (customPath && customPath !== '/') {
-                subscriptionUrl += \`&path=\${readableParamValue(customPath)}\`;
+                subscriptionUrl += \`&path=\${encodeURIComponent(customPath)}\`;
             }
             
             let finalUrl = subscriptionUrl;
@@ -1618,18 +1551,8 @@ function generateHomePage(scuValue) {
                     });
                 }
             } else {
-                const localTargets = {
-                    clash: 'clash',
-                    surge: 'surge',
-                    quanx: 'quantumult'
-                };
-                const localTarget = localTargets[clientType];
-                if (localTarget) {
-                    finalUrl = subscriptionUrl + '&target=' + localTarget;
-                } else {
-                    const encodedUrl = readableParamValue(subscriptionUrl);
-                    finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
-                }
+                const encodedUrl = encodeURIComponent(subscriptionUrl);
+                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
                 
                 const urlElement = document.getElementById('clientSubscriptionUrl');
                 urlElement.textContent = finalUrl;
