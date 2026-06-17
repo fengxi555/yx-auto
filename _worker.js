@@ -1603,8 +1603,18 @@ function generateHomePage(scuValue) {
                     });
                 }
             } else {
-                const encodedUrl = readableParamValue(subscriptionUrl);
-                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
+                const localTargets = {
+                    clash: 'clash',
+                    surge: 'surge',
+                    quanx: 'quantumult'
+                };
+                const localTarget = localTargets[clientType];
+                if (localTarget) {
+                    finalUrl = subscriptionUrl + '&target=' + localTarget;
+                } else {
+                    const encodedUrl = readableParamValue(subscriptionUrl);
+                    finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
+                }
                 
                 const urlElement = document.getElementById('clientSubscriptionUrl');
                 urlElement.textContent = finalUrl;
