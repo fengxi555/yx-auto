@@ -46,24 +46,6 @@ function getConfigValue(key, defaultValue) {
     return defaultValue || '';
 }
 
-function safeUrlDecode(value) {
-    try {
-        return decodeURIComponent(value);
-    } catch (e) {
-        return value;
-    }
-}
-
-function decodeGeneratedLinks(links) {
-    return links.map(link => safeUrlDecode(link));
-}
-
-function utf8ToBase64(str) {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function toSolidBytes(match, p1) {
-        return String.fromCharCode('0x' + p1);
-    }));
-}
-
 // 获取动态IP列表（支持IPv4/IPv6和运营商筛选）
 async function fetchDynamicIPs(ipv4Enabled = true, ipv6Enabled = true, ispMobile = true, ispUnicom = true, ispTelecom = true) {
     const v4Url = "https://www.wetest.vip/page/cloudflare/address_v4.html";
@@ -271,6 +253,73 @@ async function fetchAndParseNewIPs(piu) {
     } catch (error) {
         return [];
     }
+}
+
+async function parseCustomPreferredDomains(input) {
+    const text = await loadCustomPreferredText(input);
+    if (!text) return [];
+    return splitPreferredEntries(text).map(item => parsePreferredEntry(item, 'isp')).filter(Boolean);
+}
+
+async function parseCustomPreferredIPs(input) {
+    const text = await loadCustomPreferredText(input);
+    if (!text) return [];
+    return splitPreferredEntries(text).map(item => parsePreferredEntry(item, 'name')).filter(Boolean);
+}
+
+async function loadCustomPreferredText(input) {
+    const text = (input || '').trim();
+    if (!text) return '';
+    try {
+        const parts = text.replace(/\r/g, '\n').split('\n').map(line => line.trim()).filter(Boolean);
+        const loaded = [];
+        for (const part of parts) {
+            if (/^https?:\/\//i.test(part)) {
+                try {
+                    const response = await fetch(part, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                    if (response.ok) {
+                        loaded.push(await response.text());
+                    }
+                } catch (e) { }
+            } else {
+                loaded.push(part);
+            }
+        }
+        return loaded.join('\n');
+    } catch (error) {
+        return text;
+    }
+}
+
+function splitPreferredEntries(text) {
+    const content = String(text || '').replace(/\r/g, '\n').trim();
+    if (!content) return [];
+    const starts = [];
+    const startRegex = /(^|\s)(\[[\da-fA-F:]+\]|(?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+):(\d+)(?=#|\s|$)/g;
+    let match;
+    while ((match = startRegex.exec(content)) !== null) {
+        starts.push({ start: match.index + match[1].length, prefix: match.index });
+    }
+    if (starts.length > 0) {
+        return starts.map((item, index) => {
+            const end = index + 1 < starts.length ? starts[index + 1].prefix : content.length;
+            return content.slice(item.start, end).trim();
+        }).filter(Boolean);
+    }
+    return content.split(/[\n,]+/).map(item => item.trim()).filter(Boolean);
+}
+
+function parsePreferredEntry(raw, nameField) {
+    const text = String(raw || '').trim();
+    if (!text) return null;
+    const match = text.match(/^(\[[\da-fA-F:]+\]|[^:#\s]+)(?::(\d+))?(?:#([\s\S]*))?$/);
+    if (!match) return null;
+    const ip = match[1].replace(/[\[\]]/g, '');
+    const remark = (match[3] || ip).trim();
+    const result = { ip };
+    if (match[2]) result.port = parseInt(match[2], 10);
+    result[nameField] = remark;
+    return result;
 }
 
 // 生成VLESS链接
@@ -515,7 +564,7 @@ function generateLinksFromNewIPs(list, user, workerDomain, customPath = '/', ech
 }
 
 // 生成订阅内容
-async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom, evEnabled, etEnabled, vmEnabled, disableNonTLS, customPath, echConfig = null) {
+async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom, evEnabled, etEnabled, vmEnabled, disableNonTLS, customPath, echConfig = null, preferredDomainInput = '', preferredIPInput = '') {
     const url = new URL(request.url);
     const finalLinks = [];
     const workerDomain = url.hostname;  // workerDomain始终是请求的hostname
@@ -545,14 +594,16 @@ async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4E
 
     // 优选域名
     if (epd) {
-        const domainList = directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
+        const customDomainList = await parseCustomPreferredDomains(preferredDomainInput);
+        const domainList = customDomainList.length > 0 ? customDomainList : directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
         await addNodesFromList(domainList);
     }
 
     // 优选IP
     if (epi) {
         try {
-            const dynamicIPList = await fetchDynamicIPs(ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom);
+            const customIPList = await parseCustomPreferredIPs(preferredIPInput);
+            const dynamicIPList = customIPList.length > 0 ? customIPList : await fetchDynamicIPs(ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom);
             if (dynamicIPList.length > 0) {
                 await addNodesFromList(dynamicIPList);
             }
@@ -669,28 +720,27 @@ async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4E
         finalLinks.push(errorLink);
     }
 
-    const outputLinks = decodeGeneratedLinks(finalLinks);
     let subscriptionContent;
     let contentType = 'text/plain; charset=utf-8';
     
     switch (target.toLowerCase()) {
         case 'clash':
         case 'clashr':
-            subscriptionContent = generateClashConfig(outputLinks);
+            subscriptionContent = generateClashConfig(finalLinks);
             contentType = 'text/yaml; charset=utf-8';
             break;
         case 'surge':
         case 'surge2':
         case 'surge3':
         case 'surge4':
-            subscriptionContent = generateSurgeConfig(outputLinks);
+            subscriptionContent = generateSurgeConfig(finalLinks);
             break;
         case 'quantumult':
         case 'quanx':
-            subscriptionContent = generateQuantumultConfig(outputLinks);
+            subscriptionContent = generateQuantumultConfig(finalLinks);
             break;
         default:
-            subscriptionContent = utf8ToBase64(outputLinks.join('\n'));
+            subscriptionContent = btoa(finalLinks.join('\n'));
     }
     
     return new Response(subscriptionContent, {
@@ -1252,12 +1302,20 @@ function generateHomePage(scuValue) {
                 </div>
                 <div class="switch active" id="switchDomain"></div>
             </div>
+            <div class="form-group" id="preferredDomainGroup" style="margin-top: 12px;">
+                <label>自定义优选域名（可选）</label>
+                <textarea id="preferredDomains" rows="4" placeholder="留空则使用内置优选域名&#10;支持一行一个域名，或填写来源链接&#10;例如：https://bestcf.pages.dev/domain/all.txt" style="font-size: 14px; resize: vertical;"></textarea>
+            </div>
             
             <div class="list-item" onclick="toggleSwitch('switchIP')">
                 <div>
                     <div class="list-item-label">启用优选IP</div>
                 </div>
                 <div class="switch active" id="switchIP"></div>
+            </div>
+            <div class="form-group" id="preferredIPGroup" style="margin-top: 12px;">
+                <label>自定义优选IP（可选）</label>
+                <textarea id="preferredIPs" rows="4" placeholder="留空则使用 wetest 动态优选IP&#10;支持一行一个IP，或 IP:端口#备注，或填写来源链接&#10;例如：https://bestcf.pages.dev/vps789/top20.txt" style="font-size: 14px; resize: vertical;"></textarea>
             </div>
             
             <div class="list-item" onclick="toggleSwitch('switchGitHub')">
@@ -1478,10 +1536,19 @@ function generateHomePage(scuValue) {
             const ispTelecom = document.getElementById('ispTelecom').checked;
             
             const githubUrl = document.getElementById('githubUrl').value.trim();
+            const preferredDomains = document.getElementById('preferredDomains').value.trim();
+            const preferredIPs = document.getElementById('preferredIPs').value.trim();
             
             const currentUrl = new URL(window.location.href);
             const baseUrl = currentUrl.origin;
             let subscriptionUrl = \`\${baseUrl}/\${uuid}/sub?domain=\${encodeURIComponent(domain)}&epd=\${switches.switchDomain ? 'yes' : 'no'}&epi=\${switches.switchIP ? 'yes' : 'no'}&egi=\${switches.switchGitHub ? 'yes' : 'no'}\`;
+            
+            if (preferredDomains) {
+                subscriptionUrl += \`&pdu=\${encodeURIComponent(preferredDomains)}\`;
+            }
+            if (preferredIPs) {
+                subscriptionUrl += \`&ipu=\${encodeURIComponent(preferredIPs)}\`;
+            }
             
             // 添加GitHub优选URL
             if (githubUrl) {
@@ -1683,6 +1750,8 @@ export default {
             epi = url.searchParams.get('epi') !== 'no';
             egi = url.searchParams.get('egi') !== 'no';
             const piu = url.searchParams.get('piu') || defaultIPURL;
+            const preferredDomainInput = url.searchParams.get('pdu') || '';
+            const preferredIPInput = url.searchParams.get('ipu') || '';
             
             // 协议选择
             const evEnabled = url.searchParams.get('ev') === 'yes' || (url.searchParams.get('ev') === null && ev);
@@ -1710,7 +1779,7 @@ export default {
             // 自定义路径
             const customPath = url.searchParams.get('path') || '/';
 
-            return await handleSubscriptionRequest(request, uuid, domain, piu, ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom, evEnabled, etEnabled, vmEnabled, disableNonTLS, customPath, echConfig);
+            return await handleSubscriptionRequest(request, uuid, domain, piu, ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom, evEnabled, etEnabled, vmEnabled, disableNonTLS, customPath, echConfig, preferredDomainInput, preferredIPInput);
         }
         
         return new Response('Not Found', { status: 404 });
