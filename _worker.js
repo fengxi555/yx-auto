@@ -292,21 +292,19 @@ async function loadCustomPreferredText(input) {
 }
 
 function splitPreferredEntries(text) {
-    const content = String(text || '').replace(/\r/g, '\n').trim();
-    if (!content) return [];
-    const starts = [];
-    const startRegex = /(^|\s)(\[[\da-fA-F:]+\]|(?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+):(\d+)(?=#|\s|$)/g;
-    let match;
-    while ((match = startRegex.exec(content)) !== null) {
-        starts.push({ start: match.index + match[1].length, prefix: match.index });
+    const lines = String(text || '').replace(/\r/g, '\n').split(/[\n,]+/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+    const entries = [];
+    const startRegex = /(^|\s)(\[[\da-fA-F:]+\]|(?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+):(\d+)(?=#|\s|$)/;
+    for (const line of lines) {
+        const m = line.match(startRegex);
+        if (m) {
+            entries.push(line.slice(m.index + m[1].length).trim());
+        } else {
+            entries.push(line);
+        }
     }
-    if (starts.length > 0) {
-        return starts.map((item, index) => {
-            const end = index + 1 < starts.length ? starts[index + 1].prefix : content.length;
-            return content.slice(item.start, end).trim();
-        }).filter(Boolean);
-    }
-    return content.split(/[\n,]+/).map(item => item.trim()).filter(Boolean);
+    return entries.filter(Boolean);
 }
 
 function parsePreferredEntry(raw, nameField) {
