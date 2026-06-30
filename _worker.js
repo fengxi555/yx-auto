@@ -11,7 +11,7 @@ let egi = true;  // 启用GitHub优选
 let ev = true;   // 启用VLESS协议
 let et = false;  // 启用Trojan协议
 let vm = false;  // 启用VMess协议
-let scu = 'https://url.v1.mk/sub';  // 订阅转换地址
+let scu = 'https://api.v1.mk/sub';  // 订阅转换地址
 // ECH (Encrypted Client Hello)
 let enableECH = false;
 let customDNS = 'https://dns.joeyblog.eu.org/joeyblog';
@@ -824,7 +824,7 @@ function generateQuantumultConfig(links) {
 
 // 生成iOS 26风格的主页
 function generateHomePage(scuValue) {
-    const scu = scuValue || 'https://url.v1.mk/sub';
+    const scu = scuValue || 'https://api.v1.mk/sub';
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1294,6 +1294,12 @@ function generateHomePage(scuValue) {
                 <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">自定义WebSocket路径，例如：/v2ray 或 /</small>
             </div>
             
+            <div class="form-group">
+                <label>订阅命名（可选）</label>
+                <input type="text" id="subscriptionName" placeholder="留空则使用转换器默认名称">
+                <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">用于支持文件名的客户端显示订阅名称</small>
+            </div>
+            
             <div class="list-item" onclick="toggleSwitch('switchDomain')">
                 <div>
                     <div class="list-item-label">启用优选域名</div>
@@ -1515,6 +1521,7 @@ function generateHomePage(scuValue) {
             const domain = document.getElementById('domain').value.trim();
             const uuid = document.getElementById('uuid').value.trim();
             const customPath = document.getElementById('customPath').value.trim() || '/';
+            const subscriptionName = document.getElementById('subscriptionName').value.trim();
             
             if (!domain || !uuid) {
                 alert('请先填写域名和UUID/Password');
@@ -1617,7 +1624,11 @@ function generateHomePage(scuValue) {
                 }
             } else {
                 const encodedUrl = encodeURIComponent(subscriptionUrl);
-                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
+                const remoteConfig = 'https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_AdblockPlus.ini';
+                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&config=' + encodeURIComponent(remoteConfig) + '&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
+                if (subscriptionName) {
+                    finalUrl += '&filename=' + encodeURIComponent(subscriptionName);
+                }
                 
                 const urlElement = document.getElementById('clientSubscriptionUrl');
                 urlElement.textContent = finalUrl;
