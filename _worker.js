@@ -908,7 +908,8 @@ function generateHomePage(scuValue) {
         }
         
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             width: 100%;
             padding: 14px 16px;
             font-size: 17px;
@@ -922,8 +923,18 @@ function generateHomePage(scuValue) {
             -webkit-appearance: none;
         }
         
+        .form-group select {
+            cursor: pointer;
+            padding-right: 36px;
+            background-image: linear-gradient(45deg, transparent 50%, #86868b 50%), linear-gradient(135deg, #86868b 50%, transparent 50%);
+            background-position: calc(100% - 18px) 52%, calc(100% - 12px) 52%;
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+        }
+        
         .form-group input:focus,
-        .form-group textarea:focus {
+        .form-group textarea:focus,
+        .form-group select:focus {
             background: rgba(142, 142, 147, 0.16);
             border-color: #007AFF;
             transform: scale(1.005);
@@ -1208,13 +1219,15 @@ function generateHomePage(scuValue) {
             }
             
             .form-group input,
-            .form-group textarea {
+            .form-group textarea,
+            .form-group select {
                 background: rgba(142, 142, 147, 0.2);
                 color: #f5f5f7;
             }
             
             .form-group input:focus,
-            .form-group textarea:focus {
+            .form-group textarea:focus,
+            .form-group select:focus {
                 background: rgba(142, 142, 147, 0.25);
                 border-color: #5ac8fa;
             }
@@ -1298,6 +1311,18 @@ function generateHomePage(scuValue) {
                 <label>订阅命名（可选）</label>
                 <input type="text" id="subscriptionName" placeholder="留空则使用转换器默认名称">
                 <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">用于支持文件名的客户端显示订阅名称</small>
+            </div>
+            
+            <div class="form-group">
+                <label>远程配置</label>
+                <select id="remoteConfig">
+                    <option value="https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_NoAuto.ini" selected>默认</option>
+                    <option value="https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_AdblockPlus.ini">默认（自动测速）</option>
+                    <option value="https://raw.githubusercontent.com/youshandefeiyang/webcdn/main/SONY.ini">默认（索尼电视专用）</option>
+                    <option value="https://gist.githubusercontent.com/tindy2013/1fa08640a9088ac8652dbd40c5d2715b/raw/default_with_clash_adg.yml">默认（附带用于 Clash 的 AdGuard DNS）</option>
+                    <option value="">不指定（使用后端默认）</option>
+                </select>
+                <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">用于订阅转换器生成代理组和分流规则</small>
             </div>
             
             <div class="list-item" onclick="toggleSwitch('switchDomain')">
@@ -1522,6 +1547,7 @@ function generateHomePage(scuValue) {
             const uuid = document.getElementById('uuid').value.trim();
             const customPath = document.getElementById('customPath').value.trim() || '/';
             const subscriptionName = document.getElementById('subscriptionName').value.trim();
+            const remoteConfig = document.getElementById('remoteConfig').value.trim();
             
             if (!domain || !uuid) {
                 alert('请先填写域名和UUID/Password');
@@ -1624,8 +1650,11 @@ function generateHomePage(scuValue) {
                 }
             } else {
                 const encodedUrl = encodeURIComponent(subscriptionUrl);
-                const remoteConfig = 'https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_AdblockPlus.ini';
-                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false&config=' + encodeURIComponent(remoteConfig) + '&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
+                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
+                if (remoteConfig) {
+                    finalUrl += '&config=' + encodeURIComponent(remoteConfig);
+                }
+                finalUrl += '&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
                 if (subscriptionName) {
                     finalUrl += '&filename=' + encodeURIComponent(subscriptionName);
                 }
