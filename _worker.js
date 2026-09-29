@@ -749,29 +749,243 @@ async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4E
     });
 }
 
-// 生成Clash配置（简化版，返回YAML格式）
+// ===== 自定义 Clash 底座（fake-ip DNS）与 ACL4SSR 规则模板 =====
+const CUSTOM_CLASH_BASE_YAML = [
+  "port: 7890",
+  "socks-port: 7891",
+  "allow-lan: true",
+  "bind-address: \"*\"",
+  "ipv6: false",
+  "mode: Rule",
+  "log-level: info",
+  "external-controller: 127.0.0.1:9090",
+  "dns:",
+  "  enable: true",
+  "  ipv6: false",
+  "  listen: 0.0.0.0:53",
+  "  enhanced-mode: fake-ip",
+  "  fake-ip-range: 198.18.0.1/16",
+  "  use-hosts: true",
+  "  fake-ip-filter:",
+  "    - \"+.lan\"",
+  "    - \"+.local\"",
+  "    - \"+.stun.*.*\"",
+  "    - \"+.stun.*.*.*\"",
+  "    - \"+.stun.*.*.*.*\"",
+  "    - \"+.msftconnecttest.com\"",
+  "    - \"+.msftncsi.com\"",
+  "    - \"localhost.ptlogin2.qq.com\"",
+  "    - \"+.srv.nintendo.net\"",
+  "    - \"+.stun.playstation.net\"",
+  "    - \"xbox.*.microsoft.com\"",
+  "    - \"+.xboxlive.com\"",
+  "    - \"time.*.com\"",
+  "    - \"ntp.*.com\"",
+  "    - \"+.pool.ntp.org\"",
+  "    - \"+.mcdn.bilivideo.cn\"",
+  "  default-nameserver:",
+  "    - 223.5.5.5",
+  "    - 119.29.29.29",
+  "  nameserver:",
+  "    - 223.5.5.5",
+  "    - 119.29.29.29",
+  "  proxy-server-nameserver:",
+  "    - 223.5.5.5",
+  "    - 119.29.29.29",
+  "sniffer:",
+  "  enable: true",
+  "  force-dns-mapping: true",
+  "  parse-pure-ip: true",
+  "  override-destination: false",
+  "  sniff:",
+  "    TLS:",
+  "      ports: [443, 8443]",
+  "    HTTP:",
+  "      ports: [80, 8080-8880]",
+  "      override-destination: true",
+  "    QUIC:",
+  "      ports: [443, 8443]",
+];
+const ACL4SSR_INI_LINES = [
+  ";不要随意改变关键字，否则会导致出错",
+  ";acl4SSR规则",
+  "",
+  ";去广告：支持",
+  ";自动测速：支持",
+  ";微软分流：支持",
+  ";苹果分流：支持",
+  ";增强中国IP段：支持",
+  ";增强国外GFW：支持",
+  "",
+  ";设置规则标志位",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/LocalAreaNetwork.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/UnBan.list",
+  "ruleset=🛑 广告拦截,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanAD.list",
+  "ruleset=🍃 应用净化,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanProgramAD.list",
+  "ruleset=🆎 AdBlock,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanEasyList.list",
+  "ruleset=🆎 AdBlock,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanEasyListChina.list",
+  "ruleset=🛡️ 隐私防护,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanEasyPrivacy.list",
+  "ruleset=📢 谷歌FCM,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/GoogleFCM.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/GoogleCN.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/SteamCN.list",
+  "ruleset=Ⓜ️ 微软Bing,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Bing.list",
+  "ruleset=Ⓜ️ 微软云盘,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/OneDrive.list",
+  "ruleset=Ⓜ️ 微软服务,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Microsoft.list",
+  "ruleset=🍎 苹果服务,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Apple.list",
+  "ruleset=📲 电报消息,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Telegram.list",
+  "ruleset=💬 Ai平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/AI.list",
+  "ruleset=💬 Ai平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/AI.list",
+  "ruleset=💬 Ai平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list",
+  "ruleset=🎶 网易音乐,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/NetEaseMusic.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Epic.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Origin.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Sony.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Steam.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Nintendo.list",
+  "ruleset=📹 油管视频,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/YouTube.list",
+  "ruleset=🎥 奈飞视频,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Netflix.list",
+  "ruleset=📺 巴哈姆特,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Bahamut.list",
+  "ruleset=📺 哔哩哔哩,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/BilibiliHMT.list",
+  "ruleset=📺 哔哩哔哩,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Bilibili.list",
+  "ruleset=🌏 国内媒体,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaMedia.list",
+  "ruleset=🌍 国外媒体,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyMedia.list",
+  "ruleset=🚀 节点选择,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyGFWlist.list",
+  ";ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaIp.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaDomain.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaCompanyIp.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Download.list",
+  ";ruleset=🎯 全球直连,[]GEOIP,LAN",
+  "ruleset=🎯 全球直连,[]GEOIP,CN",
+  "ruleset=🐟 漏网之鱼,[]FINAL",
+  ";设置规则标志位",
+  "",
+  ";设置分组标志位",
+  "custom_proxy_group=🚀 节点选择`select`[]♻️ 自动选择`[]🔯 故障转移`[]🔮 负载均衡`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=🚀 手动切换`select`.*",
+  "custom_proxy_group=♻️ 自动选择`url-test`.*`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🔯 故障转移`fallback`.*`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🔮 负载均衡`load-balance`.*`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=📲 电报消息`select`[]🚀 节点选择`[]♻️ 自动选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=💬 Ai平台`select`[]🚀 节点选择`[]♻️ 自动选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=📹 油管视频`select`[]🚀 节点选择`[]♻️ 自动选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=🎥 奈飞视频`select`[]🎥 奈飞节点`[]🚀 节点选择`[]♻️ 自动选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=📺 巴哈姆特`select`[]🇨🇳 台湾节点`[]🚀 节点选择`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=📺 哔哩哔哩`select`[]🎯 全球直连`[]🇨🇳 台湾节点`[]🇭🇰 香港节点",
+  "custom_proxy_group=🌍 国外媒体`select`[]🚀 节点选择`[]♻️ 自动选择`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=🌏 国内媒体`select`[]DIRECT`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🚀 手动切换",
+  "custom_proxy_group=📢 谷歌FCM`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=Ⓜ️ 微软Bing`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=Ⓜ️ 微软云盘`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=Ⓜ️ 微软服务`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🍎 苹果服务`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🎮 游戏平台`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🎶 网易音乐`select`[]DIRECT`[]🚀 节点选择`[]♻️ 自动选择`(网易|音乐|解锁|Music|NetEase)",
+  "custom_proxy_group=🎯 全球直连`select`[]DIRECT`[]🚀 节点选择`[]♻️ 自动选择",
+  "custom_proxy_group=🛑 广告拦截`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🍃 应用净化`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🆎 AdBlock`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🛡️ 隐私防护`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🐟 漏网之鱼`select`[]🚀 节点选择`[]♻️ 自动选择`[]DIRECT`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🇭🇰 香港节点`url-test`(港|HK|hk|Hong Kong|HongKong|hongkong)`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🇯🇵 日本节点`url-test`(日本|川日|东京|大阪|泉日|埼玉|沪日|深日|JP|Japan)`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🇺🇲 美国节点`url-test`(美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States)`http://www.gstatic.com/generate_204`300,,150",
+  "custom_proxy_group=🇨🇳 台湾节点`url-test`(台|新北|彰化|TW|Taiwan)`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🇸🇬 狮城节点`url-test`(新加坡|坡|狮城|SG|Singapore)`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🇰🇷 韩国节点`url-test`(KR|Korea|KOR|首尔|韩|韓)`http://www.gstatic.com/generate_204`300,,50",
+  "custom_proxy_group=🎥 奈飞节点`select`(NF|奈飞|解锁|Netflix|NETFLIX|Media)",
+  ";设置分组标志位",
+  "",
+  "enable_rule_generator=true",
+  "overwrite_original_rules=true",
+  "",
+  ";clash_rule_base=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/GeneralClashConfig.yml",
+  "",
+  ";luck",
+];
+
+// 生成Clash配置（返回YAML格式；含 fake-ip DNS，被污染域名也能按域名规则走代理）
 function generateClashConfig(links) {
     let yaml = 'port: 7890\n';
     yaml += 'socks-port: 7891\n';
     yaml += 'allow-lan: false\n';
     yaml += 'mode: rule\n';
-    yaml += 'log-level: info\n\n';
+    yaml += 'log-level: info\n';
+    yaml += 'unified-delay: false\n';
+    yaml += 'tcp-concurrent: true\n';
+    yaml += '\n';
+    yaml += 'dns:\n';
+    yaml += '  enable: true\n';
+    yaml += '  listen: 0.0.0.0:53\n';
+    yaml += '  ipv6: false\n';
+    yaml += '  enhanced-mode: fake-ip\n';
+    yaml += '  fake-ip-range: 198.18.0.1/16\n';
+    yaml += '  use-hosts: true\n';
+    yaml += '  fake-ip-filter:\n';
+    yaml += '    - "+.lan"\n';
+    yaml += '    - "+.local"\n';
+    yaml += '    - "+.stun.*.*"\n';
+    yaml += '    - "+.stun.*.*.*"\n';
+    yaml += '    - "+.stun.*.*.*.*"\n';
+    yaml += '    - "+.msftconnecttest.com"\n';
+    yaml += '    - "+.msftncsi.com"\n';
+    yaml += '    - "msftconnecttest.com"\n';
+    yaml += '    - "msftncsi.com"\n';
+    yaml += '    - "localhost.ptlogin2.qq.com"\n';
+    yaml += '    - "+.srv.nintendo.net"\n';
+    yaml += '    - "+.stun.playstation.net"\n';
+    yaml += '    - "xbox.*.microsoft.com"\n';
+    yaml += '    - "+.xboxlive.com"\n';
+    yaml += '    - "+.battlenet.com.cn"\n';
+    yaml += '    - "+.wotgame.cn"\n';
+    yaml += '    - "+.wggames.cn"\n';
+    yaml += '    - "proxy.golang.org"\n';
+    yaml += '    - "+.stun.wtf"\n';
+    yaml += '    - "time.*.com"\n';
+    yaml += '    - "ntp.*.com"\n';
+    yaml += '    - "+.time.edu.cn"\n';
+    yaml += '    - "+.ntp.org.cn"\n';
+    yaml += '    - "+.pool.ntp.org"\n';
+    yaml += '    - "time1.cloud.tencent.com"\n';
+    yaml += '    - "+.mcdn.bilivideo.cn"\n';
+    yaml += '  default-nameserver:\n';
+    yaml += '    - 223.5.5.5\n';
+    yaml += '    - 119.29.29.29\n';
+    yaml += '  nameserver:\n';
+    yaml += '    - 223.5.5.5\n';
+    yaml += '    - 119.29.29.29\n';
+    yaml += '\n';
+    yaml += 'sniffer:\n';
+    yaml += '  enable: true\n';
+    yaml += '  force-dns-mapping: true\n';
+    yaml += '  parse-pure-ip: true\n';
+    yaml += '  override-destination: false\n';
+    yaml += '  sniff:\n';
+    yaml += '    TLS:\n';
+    yaml += '      ports: [443, 8443]\n';
+    yaml += '    HTTP:\n';
+    yaml += '      ports: [80, 8080-8880]\n';
+    yaml += '      override-destination: true\n';
+    yaml += '    QUIC:\n';
+    yaml += '      ports: [443, 8443]\n';
+    yaml += '\n';
     yaml += 'proxies:\n';
-    
-    const proxyNames = [];
+
+    const yamlStr = (v) => JSON.stringify(String(v));
+    const safeDecode = (v) => { try { return decodeURIComponent(v); } catch { return v; } };
+
     links.forEach((link, index) => {
-        const name = decodeURIComponent(link.split('#')[1] || `节点${index + 1}`);
-        proxyNames.push(name);
+        const rawName = safeDecode(link.split('#')[1] || `节点${index + 1}`);
+        const name = yamlStr(rawName);
         const server = link.match(/@([^:]+):(\d+)/)?.[1] || '';
         const port = link.match(/@[^:]+:(\d+)/)?.[1] || '443';
         const uuid = link.match(/vless:\/\/([^@]+)@/)?.[1] || '';
         const tls = link.includes('security=tls');
-        const path = link.match(/path=([^&#]+)/)?.[1] || '/';
+        const path = safeDecode(link.match(/path=([^&#]+)/)?.[1] || '/');
         const host = link.match(/host=([^&#]+)/)?.[1] || '';
         const sni = link.match(/sni=([^&#]+)/)?.[1] || '';
         const echParam = link.match(/[?&]ech=([^&#]+)/)?.[1];
-        const echDomain = echParam ? decodeURIComponent(echParam).split('+')[0] : '';
-        
+        const echDomain = echParam ? safeDecode(echParam).split('+')[0] : '';
+
         yaml += `  - name: ${name}\n`;
         yaml += `    type: vless\n`;
         yaml += `    server: ${server}\n`;
@@ -792,17 +1006,29 @@ function generateClashConfig(links) {
             yaml += `      query-server-name: ${echDomain}\n`;
         }
     });
-    
+
     yaml += '\nproxy-groups:\n';
-    yaml += '  - name: PROXY\n';
+    yaml += '  - name: "🚀 节点选择"\n';
     yaml += '    type: select\n';
-    yaml += `    proxies: [${proxyNames.map(n => `'${n}'`).join(', ')}]\n`;
+    yaml += '    include-all: true\n';
+    yaml += '  - name: "♻️ 自动选择"\n';
+    yaml += '    type: url-test\n';
+    yaml += '    include-all: true\n';
+    yaml += '    url: http://www.gstatic.com/generate_204\n';
+    yaml += '    interval: 300\n';
+    yaml += '    tolerance: 50\n';
     yaml += '\nrules:\n';
     yaml += '  - DOMAIN-SUFFIX,local,DIRECT\n';
-    yaml += '  - IP-CIDR,127.0.0.0/8,DIRECT\n';
-    yaml += '  - GEOIP,CN,DIRECT\n';
-    yaml += '  - MATCH,PROXY\n';
-    
+    yaml += '  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve\n';
+    yaml += '  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve\n';
+    yaml += '  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve\n';
+    yaml += '  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve\n';
+    yaml += '  - IP-CIDR6,fe80::/10,DIRECT,no-resolve\n';
+    yaml += '  - GEOSITE,private,DIRECT\n';
+    yaml += '  - GEOSITE,CN,DIRECT\n';
+    yaml += '  - GEOIP,CN,DIRECT,no-resolve\n';
+    yaml += '  - MATCH,"🚀 节点选择"\n';
+
     return yaml;
 }
 
@@ -1399,6 +1625,16 @@ function generateHomePage(scuValue) {
                     <button type="button" class="client-btn" onclick="generateClientLink('v2ray', 'Shadowrocket')" style="font-size: 13px;">Shadowrocket</button>
                 </div>
                 <div class="result-url" id="clientSubscriptionUrl" style="display: none; margin-top: 12px; padding: 12px; background: rgba(0, 122, 255, 0.1); border-radius: 8px; font-size: 13px; color: #007aff; word-break: break-all;"></div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                    <label for="shortUrlProvider" style="margin: 0; font-size: 14px; color: #1d1d1f;">生成短链接</label>
+                    <select id="shortUrlProvider" style="font-size: 14px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.15); background: #fff; color: #1d1d1f;">
+                        <option value="">不使用</option>
+                        <option value="v1mk">v1.mk</option>
+                        <option value="d1mk">d1.mk</option>
+                        <option value="suoyt">suo.yt</option>
+                        <option value="isgd">is.gd</option>
+                    </select>
+                </div>
             </div>
             
             <div class="form-group">
@@ -1497,50 +1733,6 @@ function generateHomePage(scuValue) {
         // 订阅转换地址（从服务器注入）
         const SUB_CONVERTER_URL = "${ scu }";
         
-        function tryOpenApp(schemeUrl, fallbackCallback, timeout) {
-            timeout = timeout || 2500;
-            let appOpened = false;
-            let callbackExecuted = false;
-            const startTime = Date.now();
-            
-            const blurHandler = () => {
-                const elapsed = Date.now() - startTime;
-                if (elapsed < 3000 && !callbackExecuted) {
-                    appOpened = true;
-                }
-            };
-            
-            window.addEventListener('blur', blurHandler);
-            
-            const hiddenHandler = () => {
-                const elapsed = Date.now() - startTime;
-                if (elapsed < 3000 && !callbackExecuted) {
-                    appOpened = true;
-                }
-            };
-            
-            document.addEventListener('visibilitychange', hiddenHandler);
-            
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.style.width = '1px';
-            iframe.style.height = '1px';
-            iframe.src = schemeUrl;
-            document.body.appendChild(iframe);
-            
-            setTimeout(() => {
-                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-                window.removeEventListener('blur', blurHandler);
-                document.removeEventListener('visibilitychange', hiddenHandler);
-                
-                if (!callbackExecuted) {
-                    callbackExecuted = true;
-                    if (!appOpened && fallbackCallback) {
-                        fallbackCallback();
-                    }
-                }
-            }, timeout);
-        }
         
         function generateClientLink(clientType, clientName) {
             const domain = document.getElementById('domain').value.trim();
@@ -1613,42 +1805,9 @@ function generateHomePage(scuValue) {
             }
             
             let finalUrl = subscriptionUrl;
-            let schemeUrl = '';
             let displayName = clientName || '';
             
-            if (clientType === 'v2ray') {
-                finalUrl = subscriptionUrl;
-                const urlElement = document.getElementById('clientSubscriptionUrl');
-                urlElement.textContent = finalUrl;
-                urlElement.style.display = 'block';
-                
-                if (clientName === 'V2RAY') {
-                    navigator.clipboard.writeText(finalUrl).then(() => {
-                        alert(displayName + ' 订阅链接已复制');
-                    });
-                } else if (clientName === 'Shadowrocket') {
-                    schemeUrl = 'shadowrocket://add/' + encodeURIComponent(finalUrl);
-                    tryOpenApp(schemeUrl, () => {
-                        navigator.clipboard.writeText(finalUrl).then(() => {
-                            alert(displayName + ' 订阅链接已复制');
-                        });
-                    });
-                } else if (clientName === 'V2RAYNG') {
-                    schemeUrl = 'v2rayng://install?url=' + encodeURIComponent(finalUrl);
-                    tryOpenApp(schemeUrl, () => {
-                        navigator.clipboard.writeText(finalUrl).then(() => {
-                            alert(displayName + ' 订阅链接已复制');
-                        });
-                    });
-                } else if (clientName === 'NEKORAY') {
-                    schemeUrl = 'nekoray://install-config?url=' + encodeURIComponent(finalUrl);
-                    tryOpenApp(schemeUrl, () => {
-                        navigator.clipboard.writeText(finalUrl).then(() => {
-                            alert(displayName + ' 订阅链接已复制');
-                        });
-                    });
-                }
-            } else {
+            if (clientType !== 'v2ray') {
                 const encodedUrl = encodeURIComponent(subscriptionUrl);
                 finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
                 if (remoteConfig) {
@@ -1658,44 +1817,31 @@ function generateHomePage(scuValue) {
                 if (subscriptionName) {
                     finalUrl += '&filename=' + encodeURIComponent(subscriptionName);
                 }
-                
+            }
+            
+            const finishDisplay = (urlToShow) => {
                 const urlElement = document.getElementById('clientSubscriptionUrl');
-                urlElement.textContent = finalUrl;
+                urlElement.textContent = urlToShow;
                 urlElement.style.display = 'block';
-                
-                if (clientType === 'clash') {
-                    if (clientName === 'STASH') {
-                        schemeUrl = 'stash://install?url=' + encodeURIComponent(finalUrl);
-                        displayName = 'STASH';
-                    } else {
-                        schemeUrl = 'clash://install-config?url=' + encodeURIComponent(finalUrl);
-                        displayName = 'CLASH';
-                    }
-                } else if (clientType === 'surge') {
-                    schemeUrl = 'surge:///install-config?url=' + encodeURIComponent(finalUrl);
-                    displayName = 'SURGE';
-                } else if (clientType === 'sing-box') {
-                    schemeUrl = 'sing-box://install-config?url=' + encodeURIComponent(finalUrl);
-                    displayName = 'SING-BOX';
-                } else if (clientType === 'loon') {
-                    schemeUrl = 'loon://install?url=' + encodeURIComponent(finalUrl);
-                    displayName = 'LOON';
-                } else if (clientType === 'quanx') {
-                    schemeUrl = 'quantumult-x://install-config?url=' + encodeURIComponent(finalUrl);
-                    displayName = 'QUANTUMULT X';
-                }
-                
-                if (schemeUrl) {
-                    tryOpenApp(schemeUrl, () => {
-                        navigator.clipboard.writeText(finalUrl).then(() => {
-                            alert(displayName + ' 订阅链接已复制');
-                        });
-                    });
-                } else {
-                    navigator.clipboard.writeText(finalUrl).then(() => {
-                        alert(displayName + ' 订阅链接已复制');
-                    });
-                }
+                navigator.clipboard.writeText(urlToShow).then(() => {
+                    alert(displayName + ' 订阅链接已复制');
+                }, () => {
+                    alert(displayName + ' 订阅链接已生成');
+                });
+            };
+            
+            const providerEl = document.getElementById('shortUrlProvider');
+            const provider = providerEl ? providerEl.value : '';
+            if (provider) {
+                fetch('/shorten?url=' + encodeURIComponent(finalUrl) + '&provider=' + encodeURIComponent(provider))
+                    .then(r => { if (!r.ok) throw new Error('fail'); return r.text(); })
+                    .then(t => {
+                        const shortUrl = (t || '').trim();
+                        finishDisplay(shortUrl.startsWith('http') ? shortUrl : finalUrl);
+                    })
+                    .catch(() => finishDisplay(finalUrl));
+            } else {
+                finishDisplay(finalUrl);
             }
         }
     </script>
@@ -1715,6 +1861,60 @@ export default {
             return new Response(generateHomePage(scuValue), {
                 headers: { 'Content-Type': 'text/html; charset=utf-8' }
             });
+        }
+        
+        // 短链接生成: /shorten?url=<长链接>&provider=<v1mk|d1mk|suoyt|isgd|tinyurl>
+        // mk 系协议: POST https://{host}/short，multipart 字段 longUrl=base64(长链接)，需带浏览器 UA + suburl Origin/Referer，返回 {Code:1, ShortUrl}
+        if (path === '/shorten') {
+            const longUrl = url.searchParams.get('url');
+            if (!longUrl) {
+                return new Response('missing url', { status: 400 });
+            }
+            const provider = url.searchParams.get('provider') || 'v1mk';
+            const MK_HOSTS = { v1mk: 'v1.mk', d1mk: 'd1.mk', suoyt: 'suo.yt' };
+            const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+            const tryText = async (api) => {
+                const resp = await fetch(api, { headers: { 'User-Agent': BROWSER_UA } });
+                if (!resp.ok) return '';
+                const text = (await resp.text()).trim();
+                return (text.startsWith('http') && text.length < 100) ? text : '';
+            };
+            const chain = [];
+            if (MK_HOSTS[provider]) chain.push('mk');
+            if (provider !== 'tinyurl') chain.push('isgd');
+            chain.push('tinyurl');
+            for (const kind of chain) {
+                try {
+                    if (kind === 'mk') {
+                        const fd = new FormData();
+                        fd.append('longUrl', btoa(longUrl));
+                        const resp = await fetch('https://' + MK_HOSTS[provider] + '/short', {
+                            method: 'POST',
+                            body: fd,
+                            headers: {
+                                'User-Agent': BROWSER_UA,
+                                'Origin': 'https://suburl.v1.mk',
+                                'Referer': 'https://suburl.v1.mk/'
+                            }
+                        });
+                        const data = await resp.json();
+                        if (data && data.Code === 1 && data.ShortUrl) {
+                            return new Response(data.ShortUrl, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+                        }
+                    } else if (kind === 'isgd') {
+                        const shortUrl = await tryText('https://is.gd/create.php?format=simple&url=' + encodeURIComponent(longUrl));
+                        if (shortUrl) {
+                            return new Response(shortUrl, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+                        }
+                    } else {
+                        const shortUrl = await tryText('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl));
+                        if (shortUrl) {
+                            return new Response(shortUrl, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+                        }
+                    }
+                } catch (e) { }
+            }
+            return new Response('shorten failed', { status: 502 });
         }
         
         // 测试优选API API: /test-optimize-api?url=xxx&port=443
@@ -1773,6 +1973,23 @@ export default {
             }
         }
         
+        // 自定义 Clash 底座: /{UUID}/clash-base.yaml （fake-ip DNS，供 api.v1.mk 的 clash_rule_base 使用）
+        if (path.endsWith('/clash-base.yaml')) {
+            return new Response(CUSTOM_CLASH_BASE_YAML, {
+                headers: { 'Content-Type': 'text/yaml; charset=utf-8', 'Cache-Control': 'no-store' }
+            });
+        }
+
+        // 自定义规则模板: /{UUID}/clash-rules.ini （ACL4SSR 分组规则 + 指向上面底座，供 api.v1.mk 的 config= 使用）
+        if (path.endsWith('/clash-rules.ini')) {
+            const iniUuid = path.slice(1, path.length - '/clash-rules.ini'.length);
+            const origin = new URL(request.url).origin;
+            const iniLines = ['[custom]', 'clash_rule_base=' + origin + '/' + iniUuid + '/clash-base.yaml'].concat(ACL4SSR_INI_LINES);
+            return new Response(iniLines.join(String.fromCharCode(10)) + String.fromCharCode(10), {
+                headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+            });
+        }
+
         // 订阅请求格式: /{UUID或Password}/sub?domain=xxx&epd=yes&epi=yes&egi=yes
         const pathMatch = path.match(/^\/([^\/]+)\/sub$/);
         if (pathMatch) {
