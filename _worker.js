@@ -902,6 +902,127 @@ const ACL4SSR_INI_LINES = [
   "",
   ";luck",
 ];
+const ACL4SSR_NOAUTO_INI_LINES = [
+  ";不要随意改变关键字，否则会导致出错",
+  ";acl4SSR规则",
+  "",
+  ";去广告：支持",
+  ";自动测速：不支持",
+  ";微软分流：支持",
+  ";苹果分流：支持",
+  ";增强中国IP段：支持",
+  ";增强国外GFW：支持",
+  "",
+  ";设置规则标志位",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/LocalAreaNetwork.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/UnBan.list",
+  "ruleset=🛑 广告拦截,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanAD.list",
+  "ruleset=🍃 应用净化,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanProgramAD.list",
+  "ruleset=📢 谷歌FCM,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/GoogleFCM.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/GoogleCN.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/SteamCN.list",
+  "ruleset=Ⓜ️ 微软Bing,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Bing.list",
+  "ruleset=Ⓜ️ 微软云盘,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/OneDrive.list",
+  "ruleset=Ⓜ️ 微软服务,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Microsoft.list",
+  "ruleset=🍎 苹果服务,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Apple.list",
+  "ruleset=📲 电报消息,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Telegram.list",
+  "ruleset=💬 Ai平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/AI.list",
+  "ruleset=💬 Ai平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list",
+  "ruleset=🎶 网易音乐,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/NetEaseMusic.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Epic.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Origin.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Sony.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Steam.list",
+  "ruleset=🎮 游戏平台,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Nintendo.list",
+  "ruleset=📹 油管视频,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/YouTube.list",
+  "ruleset=🎥 奈飞视频,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Netflix.list",
+  "ruleset=📺 巴哈姆特,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Bahamut.list",
+  "ruleset=📺 哔哩哔哩,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/BilibiliHMT.list",
+  "ruleset=📺 哔哩哔哩,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/Bilibili.list",
+  "ruleset=🌏 国内媒体,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaMedia.list",
+  "ruleset=🌍 国外媒体,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyMedia.list",
+  "ruleset=🚀 节点选择,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyGFWlist.list",
+  ";ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaIp.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaDomain.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaCompanyIp.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Download.list",
+  ";ruleset=🎯 全球直连,[]GEOIP,LAN",
+  "ruleset=🎯 全球直连,[]GEOIP,CN",
+  "ruleset=🐟 漏网之鱼,[]FINAL",
+  ";设置规则标志位",
+  "",
+  ";设置分组标志位",
+  "custom_proxy_group=🚀 节点选择`select`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=🚀 手动切换`select`.*",
+  "custom_proxy_group=📲 电报消息`select`[]🚀 节点选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=💬 Ai平台`select`[]🚀 节点选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=📹 油管视频`select`[]🚀 节点选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=🎥 奈飞视频`select`[]🎥 奈飞节点`[]🚀 节点选择`[]🇸🇬 狮城节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=📺 巴哈姆特`select`[]🇨🇳 台湾节点`[]🚀 节点选择`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=📺 哔哩哔哩`select`[]🎯 全球直连`[]🇨🇳 台湾节点`[]🇭🇰 香港节点",
+  "custom_proxy_group=🌍 国外媒体`select`[]🚀 节点选择`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换`[]DIRECT",
+  "custom_proxy_group=🌏 国内媒体`select`[]DIRECT`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🚀 手动切换",
+  "custom_proxy_group=📢 谷歌FCM`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=Ⓜ️ 微软Bing`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=Ⓜ️ 微软云盘`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=Ⓜ️ 微软服务`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🍎 苹果服务`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🎮 游戏平台`select`[]DIRECT`[]🚀 节点选择`[]🇺🇲 美国节点`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🎶 网易音乐`select`[]DIRECT`[]🚀 节点选择`(网易|音乐|解锁|Music|NetEase)",
+  "custom_proxy_group=🎯 全球直连`select`[]DIRECT`[]🚀 节点选择",
+  "custom_proxy_group=🛑 广告拦截`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🍃 应用净化`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🐟 漏网之鱼`select`[]🚀 节点选择`[]DIRECT`[]🇭🇰 香港节点`[]🇨🇳 台湾节点`[]🇸🇬 狮城节点`[]🇯🇵 日本节点`[]🇺🇲 美国节点`[]🇰🇷 韩国节点`[]🚀 手动切换",
+  "custom_proxy_group=🇭🇰 香港节点`select`(港|HK|hk|Hong Kong|HongKong|hongkong)",
+  "custom_proxy_group=🇯🇵 日本节点`select`(日本|川日|东京|大阪|泉日|埼玉|沪日|深日|JP|Japan)",
+  "custom_proxy_group=🇺🇲 美国节点`select`(美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States)",
+  "custom_proxy_group=🇸🇬 狮城节点`select`(新加坡|坡|狮城|SG|Singapore)",
+  "custom_proxy_group=🇨🇳 台湾节点`select`(台|新北|彰化|TW|Taiwan)",
+  "custom_proxy_group=🇰🇷 韩国节点`select`(KR|Korea|KOR|首尔|韩|韓)",
+  "custom_proxy_group=🎥 奈飞节点`select`(NF|奈飞|解锁|Netflix|NETFLIX|Media)",
+  ";设置分组标志位",
+  "",
+  "enable_rule_generator=true",
+  "overwrite_original_rules=true",
+  "",
+  ";clash_rule_base=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/GeneralClashConfig.yml",
+  "",
+  ";luck",
+];
+const SONY_INI_LINES = [
+  ";不要随意改变关键字，否则会导致出错",
+  ";acl4SSR规则-在线版",
+  "",
+  ";去广告：支持",
+  ";自动测速：不支持",
+  ";微软分流：不支持",
+  ";苹果分流：不支持",
+  ";增强中国IP段：不支持",
+  ";增强国外GFW：不支持",
+  "",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/LocalAreaNetwork.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/UnBan.list",
+  "ruleset=🛑 全球拦截,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanAD.list",
+  "ruleset=🛑 全球拦截,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanProgramAD.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/GoogleCN.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/SteamCN.list",
+  "ruleset=🚀 国外流量,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Telegram.list",
+  "ruleset=🚀 国外流量,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyMedia.list",
+  "ruleset=🚀 国外流量,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyLite.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaDomain.list",
+  "ruleset=🎯 全球直连,https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaCompanyIp.list",
+  ";ruleset=🎯 全球直连,[]GEOIP,LAN",
+  "ruleset=🎯 全球直连,[]GEOIP,CN",
+  "ruleset=🐟 漏网之鱼,[]FINAL",
+  "",
+  "custom_proxy_group=🚀 国外流量`select`[]DIRECT`.*",
+  "custom_proxy_group=🎯 全球直连`select`[]DIRECT`[]🚀 国外流量",
+  "custom_proxy_group=🛑 全球拦截`select`[]REJECT`[]DIRECT",
+  "custom_proxy_group=🐟 漏网之鱼`select`[]🚀 国外流量`[]🎯 全球直连`.*",
+  "",
+  "enable_rule_generator=true",
+  "overwrite_original_rules=true",
+];
 
 // 生成Clash配置（返回YAML格式；含 fake-ip DNS，被污染域名也能按域名规则走代理）
 function generateClashConfig(links) {
@@ -1542,11 +1663,11 @@ function generateHomePage(scuValue) {
             <div class="form-group">
                 <label>远程配置</label>
                 <select id="remoteConfig">
-                    <option value="https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_NoAuto.ini" selected>默认</option>
-                    <option value="https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_AdblockPlus.ini">默认（自动测速）</option>
-                    <option value="https://raw.githubusercontent.com/youshandefeiyang/webcdn/main/SONY.ini">默认（索尼电视专用）</option>
+                    <option value="__noauto__" selected>默认</option>
+                    <option value="__adblock__">默认（自动测速）</option>
+                    <option value="__sony__">默认（索尼电视专用）</option>
                     <option value="https://gist.githubusercontent.com/tindy2013/1fa08640a9088ac8652dbd40c5d2715b/raw/default_with_clash_adg.yml">默认（附带用于 Clash 的 AdGuard DNS）</option>
-                    <option value="">不指定（使用后端默认）</option>
+                    <option value="__nodefault__">不指定（使用后端默认）</option>
                 </select>
                 <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">用于订阅转换器生成代理组和分流规则</small>
             </div>
@@ -1764,6 +1885,8 @@ function generateHomePage(scuValue) {
             
             const currentUrl = new URL(window.location.href);
             const baseUrl = currentUrl.origin;
+            const CFG_FILE_MAP = { '__noauto__': 'clash-rules-noauto.ini', '__adblock__': 'clash-rules.ini', '__sony__': 'clash-rules-sony.ini', '__nodefault__': 'clash-rules-default.ini' };
+            const effectiveRemote = CFG_FILE_MAP[remoteConfig] ? baseUrl + '/' + uuid + '/' + CFG_FILE_MAP[remoteConfig] : remoteConfig;
             let subscriptionUrl = \`\${baseUrl}/\${uuid}/sub?domain=\${encodeURIComponent(domain)}&epd=\${switches.switchDomain ? 'yes' : 'no'}&epi=\${switches.switchIP ? 'yes' : 'no'}&egi=\${switches.switchGitHub ? 'yes' : 'no'}\`;
             
             if (preferredDomains) {
@@ -1810,8 +1933,8 @@ function generateHomePage(scuValue) {
             if (clientType !== 'v2ray') {
                 const encodedUrl = encodeURIComponent(subscriptionUrl);
                 finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
-                if (remoteConfig) {
-                    finalUrl += '&config=' + encodeURIComponent(remoteConfig);
+                if (effectiveRemote) {
+                    finalUrl += '&config=' + encodeURIComponent(effectiveRemote);
                 }
                 finalUrl += '&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
                 if (subscriptionName) {
@@ -1980,14 +2103,26 @@ export default {
             });
         }
 
-        // 自定义规则模板: /{UUID}/clash-rules.ini （ACL4SSR 分组规则 + 指向上面底座，供 api.v1.mk 的 config= 使用）
-        if (path.endsWith('/clash-rules.ini')) {
-            const iniUuid = path.slice(1, path.length - '/clash-rules.ini'.length);
-            const origin = new URL(request.url).origin;
-            const iniLines = ['[custom]', 'clash_rule_base=' + origin + '/' + iniUuid + '/clash-base.yaml'].concat(ACL4SSR_INI_LINES);
-            return new Response(iniLines.join(String.fromCharCode(10)) + String.fromCharCode(10), {
-                headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
-            });
+        // 自定义规则模板: /{UUID}/clash-rules*.ini （各模板原文 + 指向底座的 clash_rule_base，供 api.v1.mk 的 config= 使用）
+        const RULE_TPL_FILES = {
+            'clash-rules.ini': ACL4SSR_INI_LINES,
+            'clash-rules-noauto.ini': ACL4SSR_NOAUTO_INI_LINES,
+            'clash-rules-sony.ini': SONY_INI_LINES,
+            'clash-rules-default.ini': null
+        };
+        for (const ruleFile in RULE_TPL_FILES) {
+            if (path.endsWith('/' + ruleFile)) {
+                const iniUuid = path.slice(1, path.length - ruleFile.length - 1);
+                const origin = new URL(request.url).origin;
+                const iniLines = ['[custom]', 'clash_rule_base=' + origin + '/' + iniUuid + '/clash-base.yaml'];
+                const tplBody = RULE_TPL_FILES[ruleFile];
+                if (tplBody) {
+                    iniLines.push.apply(iniLines, tplBody);
+                }
+                return new Response(iniLines.join(String.fromCharCode(10)) + String.fromCharCode(10), {
+                    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }
+                });
+            }
         }
 
         // 订阅请求格式: /{UUID或Password}/sub?domain=xxx&epd=yes&epi=yes&egi=yes
