@@ -1975,7 +1975,7 @@ export default {
         
         // 自定义 Clash 底座: /{UUID}/clash-base.yaml （fake-ip DNS，供 api.v1.mk 的 clash_rule_base 使用）
         if (path.endsWith('/clash-base.yaml')) {
-            return new Response(CUSTOM_CLASH_BASE_YAML, {
+            return new Response(CUSTOM_CLASH_BASE_YAML.join(String.fromCharCode(10)), {
                 headers: { 'Content-Type': 'text/yaml; charset=utf-8', 'Cache-Control': 'no-store' }
             });
         }
