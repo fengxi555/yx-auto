@@ -320,6 +320,26 @@ function parsePreferredEntry(raw, nameField) {
     return result;
 }
 
+// 统一清理节点名（去零宽水印等不可见字符）并在本订阅内去重（重复名追加 _2/_3…）
+function sanitizeAndDedupeLinkNames(links) {
+    const used = new Map();
+    for (let i = 0; i < links.length; i++) {
+        const hashIdx = links[i].indexOf('#');
+        if (hashIdx === -1) continue;
+        let name;
+        try {
+            name = decodeURIComponent(links[i].slice(hashIdx + 1));
+        } catch (e) {
+            name = links[i].slice(hashIdx + 1);
+        }
+        name = name.replace(/[\u200b-\u200f\ufeff]/g, '').replace(/\s{2,}/g, ' ').trim();
+        if (!name) name = 'node';
+        const count = (used.get(name) || 0) + 1;
+        used.set(name, count);
+        links[i] = links[i].slice(0, hashIdx + 1) + encodeURIComponent(count > 1 ? name + '_' + count : name);
+    }
+}
+
 // 生成VLESS链接
 function generateLinksFromSource(list, user, workerDomain, disableNonTLS = false, customPath = '/', echConfig = null) {
     const CF_HTTP_PORTS = [80, 8080, 8880, 2052, 2082, 2086, 2095];
@@ -717,6 +737,9 @@ async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4E
         const errorLink = `vless://00000000-0000-0000-0000-000000000000@127.0.0.1:80?encryption=none&security=none&type=ws&host=error.com&path=%2F#${encodeURIComponent(errorRemark)}`;
         finalLinks.push(errorLink);
     }
+
+    // 统一清理节点名并去重，保证 clash / 原始链接等所有输出目标的名字干净且唯一
+    sanitizeAndDedupeLinkNames(finalLinks);
 
     let subscriptionContent;
     let contentType = 'text/plain; charset=utf-8';
