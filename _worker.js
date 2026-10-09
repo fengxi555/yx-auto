@@ -1932,14 +1932,12 @@ function generateHomePage(scuValue) {
             
             if (clientType !== 'v2ray') {
                 const encodedUrl = encodeURIComponent(subscriptionUrl);
-                finalUrl = SUB_CONVERTER_URL + '?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
+                // 走本站 /final 中转（worker 云端代拉 api.v1.mk 并缓存），客户端只访问本域，避开被劣化的第三方 SNI
+                finalUrl = baseUrl + '/' + uuid + '/final?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
                 if (effectiveRemote) {
                     finalUrl += '&config=' + encodeURIComponent(effectiveRemote);
                 }
                 finalUrl += '&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true';
-                if (subscriptionName) {
-                    finalUrl += '&filename=' + encodeURIComponent(subscriptionName);
-                }
             }
             
             const finishDisplay = (urlToShow) => {
@@ -1970,6 +1968,56 @@ function generateHomePage(scuValue) {
     </script>
 </body>
 </html>`;
+}
+
+// 最终订阅中转: /{UUID}/final?<与 api.v1.mk 相同的参数>
+// worker 在云端代拉 api.v1.mk（服务器到服务器，不经过被劣化的线路），结果进 CF 边缘缓存；
+// 客户端只访问本站域名，响应为 text/plain 且不带 content-disposition，浏览器直接内联显示。
+async function handleFinalRequest(request, env, ctx) {
+    const url = new URL(request.url);
+    const ALLOW = ['target', 'url', 'config', 'insert', 'emoji', 'list', 'xudp', 'udp', 'tfo', 'expand', 'scv', 'fdn', 'new_name', 'ver'];
+    const qs = new URLSearchParams();
+    for (const k of ALLOW) {
+        const v = url.searchParams.get(k);
+        if (v !== null) qs.set(k, v);
+    }
+    if (!qs.get('url')) {
+        return new Response('missing url', { status: 400 });
+    }
+    if (!qs.get('target')) {
+        qs.set('target', 'clash');
+    }
+    // 内层订阅地址统一改写为本次请求的域名：换域名/换访问入口后旧链接依然可用
+    try {
+        const inner = new URL(qs.get('url'));
+        inner.protocol = url.protocol;
+        inner.host = url.host;
+        qs.set('url', inner.toString());
+    } catch (e) { }
+    const upstream = (env && env.scu ? env.scu : scu) + '?' + qs.toString();
+    const cacheKey = new Request(upstream, { method: 'GET' });
+    const hit = await caches.default.match(cacheKey);
+    if (hit) {
+        const out = new Response(hit.body, hit);
+        out.headers.set('X-Final-Cache', 'HIT');
+        return out;
+    }
+    const upstreamResp = await fetch(upstream, {
+        headers: { 'User-Agent': request.headers.get('User-Agent') || 'clash.meta' }
+    });
+    const body = await upstreamResp.arrayBuffer();
+    const resp = new Response(body, {
+        status: upstreamResp.status,
+        headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'public, max-age=600',
+            'X-Final-Cache': 'MISS'
+        }
+    });
+    if (upstreamResp.ok) {
+        ctx.waitUntil(caches.default.put(cacheKey, resp.clone()));
+    }
+    return resp;
 }
 
 // 主处理函数
@@ -2125,6 +2173,11 @@ export default {
             }
         }
 
+        // 最终订阅中转: /{UUID}/final?target=clash&url=...&config=...  云端代拉 api.v1.mk + 边缘缓存
+        if (/^\/[^\/]+\/final$/.test(path)) {
+            return await handleFinalRequest(request, env, ctx);
+        }
+        
         // 订阅请求格式: /{UUID或Password}/sub?domain=xxx&epd=yes&epi=yes&egi=yes
         const pathMatch = path.match(/^\/([^\/]+)\/sub$/);
         if (pathMatch) {
