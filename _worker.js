@@ -1972,8 +1972,11 @@ function generateHomePage(scuValue) {
 
 // 最终订阅中转: /{UUID}/final?<与 api.v1.mk 相同的参数>
 // worker 在云端代拉 api.v1.mk（服务器到服务器，不经过被劣化的线路），结果进 CF 边缘缓存；
+// 上游 5xx/网络失败自动重试一次，仍失败则回退最长 7 天的旧快照（stale-if-error）；
 // 客户端只访问本站域名，响应为 text/plain 且不带 content-disposition，浏览器直接内联显示。
 async function handleFinalRequest(request, env, ctx) {
+    const FRESH_SEC = 1800;
+    const STALE_SEC = 604800;
     const url = new URL(request.url);
     const ALLOW = ['target', 'url', 'config', 'insert', 'emoji', 'list', 'xudp', 'udp', 'tfo', 'expand', 'scv', 'fdn', 'new_name', 'ver'];
     const qs = new URLSearchParams();
@@ -1996,28 +1999,56 @@ async function handleFinalRequest(request, env, ctx) {
     } catch (e) { }
     const upstream = (env && env.scu ? env.scu : scu) + '?' + qs.toString();
     const cacheKey = new Request(upstream, { method: 'GET' });
-    const hit = await caches.default.match(cacheKey);
-    if (hit) {
-        const out = new Response(hit.body, hit);
+    const now = Math.floor(Date.now() / 1000);
+    const cached = await caches.default.match(cacheKey);
+    const storedAt = cached ? (parseInt(cached.headers.get('X-Stored-At') || '0', 10) || 0) : 0;
+    if (cached && now - storedAt < FRESH_SEC) {
+        const out = new Response(cached.body, cached);
         out.headers.set('X-Final-Cache', 'HIT');
+        out.headers.set('Cache-Control', 'public, max-age=600');
         return out;
     }
-    const upstreamResp = await fetch(upstream, {
-        headers: { 'User-Agent': request.headers.get('User-Agent') || 'clash.meta' }
-    });
-    const body = await upstreamResp.arrayBuffer();
-    const resp = new Response(body, {
-        status: upstreamResp.status,
-        headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Cache-Control': 'public, max-age=600',
-            'X-Final-Cache': 'MISS'
-        }
-    });
-    if (upstreamResp.ok) {
-        ctx.waitUntil(caches.default.put(cacheKey, resp.clone()));
+    let upstreamResp = null;
+    for (let attempt = 0; attempt < 2 && !upstreamResp; attempt++) {
+        try {
+            const r = await fetch(upstream, {
+                headers: { 'User-Agent': request.headers.get('User-Agent') || 'clash.meta' }
+            });
+            if (r.ok || r.status < 500) {
+                upstreamResp = r;
+            }
+        } catch (e) { }
     }
-    return resp;
+    if (upstreamResp && upstreamResp.ok) {
+        const body = await upstreamResp.arrayBuffer();
+        ctx.waitUntil(caches.default.put(cacheKey, new Response(body, {
+            headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'Cache-Control': 'public, max-age=' + STALE_SEC,
+                'X-Stored-At': String(now)
+            }
+        })));
+        return new Response(body, {
+            headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'Cache-Control': 'public, max-age=600',
+                'X-Final-Cache': 'MISS'
+            }
+        });
+    }
+    if (upstreamResp) {
+        return new Response(upstreamResp.body, {
+            status: upstreamResp.status,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Final-Cache': 'PASS' }
+        });
+    }
+    if (cached) {
+        const out = new Response(cached.body, cached);
+        out.headers.set('X-Final-Cache', 'STALE');
+        out.headers.set('Cache-Control', 'public, max-age=60');
+        return out;
+    }
+    return new Response('upstream unavailable, retry later', { status: 502 });
 }
 
 // 主处理函数
