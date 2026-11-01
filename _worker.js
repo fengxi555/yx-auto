@@ -308,6 +308,21 @@ function parsePreferredEntry(raw, nameField) {
     return result;
 }
 
+// 自定义 IP 列表按运营商关键词过滤：条目名带 移动/联通/电信 的按勾选保留，不带关键词的（BGP/多线等）一律保留
+function filterIPListByISP(list, ispMobile, ispUnicom, ispTelecom) {
+    const rules = [
+        { on: ispMobile, re: /移动|cmcc|chinamobile/i },
+        { on: ispUnicom, re: /联通|cucc|unicom/i },
+        { on: ispTelecom, re: /电信|ctcc|telecom/i },
+    ];
+    return list.filter(item => {
+        const label = String(item.name || item.isp || '');
+        const hit = rules.filter(r => r.re.test(label));
+        if (hit.length === 0) return true;
+        return hit.some(r => r.on);
+    });
+}
+
 // 统一清理节点名（去零宽水印等不可见字符）并在本订阅内去重（重复名追加 _2/_3…）
 function sanitizeAndDedupeLinkNames(links) {
     const used = new Map();
@@ -605,7 +620,7 @@ async function handleSubscriptionRequest(request, user, customDomain, piu, ipv4E
     if (epi) {
         try {
             const customIPList = await parseCustomPreferredIPs(preferredIPInput);
-            const dynamicIPList = customIPList.length > 0 ? customIPList : await fetchDynamicIPs(ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom);
+            const dynamicIPList = customIPList.length > 0 ? filterIPListByISP(customIPList, ispMobile, ispUnicom, ispTelecom) : await fetchDynamicIPs(ipv4Enabled, ipv6Enabled, ispMobile, ispUnicom, ispTelecom);
             if (dynamicIPList.length > 0) {
                 await addNodesFromList(dynamicIPList);
             }
