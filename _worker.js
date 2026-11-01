@@ -1649,6 +1649,12 @@ function generateHomePage(scuValue) {
                 <label>域名</label>
                 <input type="text" id="domain" placeholder="请输入您的域名">
             </div>
+
+            <div class="form-group">
+                <label>中转地址（可选）</label>
+                <input type="text" id="relayBase" placeholder="留空则直连本站；例如 http://172.245.71.111:2082">
+                <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">填写 VPS 反代地址后，生成的订阅链接改从该地址拉取（仅 CLASH/SING-BOX 等经 /final 的客户端生效）</small>
+            </div>
             
             <div class="form-group">
                 <label>UUID/Password</label>
@@ -1892,6 +1898,8 @@ function generateHomePage(scuValue) {
             
             const currentUrl = new URL(window.location.href);
             const baseUrl = currentUrl.origin;
+            const relayBase = ((document.getElementById('relayBase') || {}).value || '').trim().replace(/\/+$/, '');
+            const outputBase = relayBase || baseUrl;
             const CFG_FILE_MAP = { '__noauto__': 'clash-rules-noauto.ini', '__adblock__': 'clash-rules.ini', '__sony__': 'clash-rules-sony.ini', '__nodefault__': 'clash-rules-default.ini' };
             const effectiveRemote = CFG_FILE_MAP[remoteConfig] ? baseUrl + '/' + uuid + '/' + CFG_FILE_MAP[remoteConfig] : remoteConfig;
             let subscriptionUrl = \`\${baseUrl}/\${uuid}/sub?domain=\${encodeURIComponent(domain)}&epd=\${switches.switchDomain ? 'yes' : 'no'}&epi=\${switches.switchIP ? 'yes' : 'no'}&egi=\${switches.switchGitHub ? 'yes' : 'no'}\`;
@@ -1940,7 +1948,7 @@ function generateHomePage(scuValue) {
             if (clientType !== 'v2ray') {
                 const encodedUrl = encodeURIComponent(subscriptionUrl);
                 // 走本站 /final 中转（worker 云端代拉 api.v1.mk 并缓存），客户端只访问本域，避开被劣化的第三方 SNI
-                finalUrl = baseUrl + '/' + uuid + '/final?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
+                finalUrl = outputBase + '/' + uuid + '/final?target=' + clientType + '&url=' + encodedUrl + '&insert=false';
                 if (effectiveRemote) {
                     finalUrl += '&config=' + encodeURIComponent(effectiveRemote);
                 }
@@ -1981,6 +1989,25 @@ function generateHomePage(scuValue) {
 // worker 在云端代拉 api.v1.mk（服务器到服务器，不经过被劣化的线路），结果进 CF 边缘缓存；
 // 上游 5xx/网络失败自动重试一次，仍失败则回退最长 7 天的旧快照（stale-if-error）；
 // 客户端只访问本站域名，响应为 text/plain 且不带 content-disposition，浏览器直接内联显示。
+// 判断转换结果是否完整：clash 必须有 MATCH 收尾规则、sing-box 必须是完整 JSON、surge/loon/quanx 必须有收尾规则
+function looksCompleteSubscription(buf, target) {
+    if (!buf || buf.byteLength < 4096) return false;
+    let text = '';
+    try {
+        text = new TextDecoder().decode(buf);
+    } catch (e) {
+        return false;
+    }
+    if (!/\n\s*$/.test(text)) return false;
+    const t = String(target || 'clash').toLowerCase();
+    if (t === 'singbox' || t === 'sing-box') {
+        return /^\s*\{/.test(text) && /\}\s*$/.test(text);
+    }
+    if (/\bMATCH,/.test(text)) return true;
+    if (/\bFINAL,/.test(text)) return true;
+    return /\bfinal,\s*(DIRECT|PROXY|REJECT)/i.test(text);
+}
+
 async function handleFinalRequest(request, env, ctx) {
     const FRESH_SEC = 1800;
     const STALE_SEC = 604800;
@@ -2005,7 +2032,8 @@ async function handleFinalRequest(request, env, ctx) {
         qs.set('url', inner.toString());
     } catch (e) { }
     const upstream = (env && env.scu ? env.scu : scu) + '?' + qs.toString();
-    const cacheKey = new Request(upstream, { method: 'GET' });
+    // 缓存键带版本号：校验规则变更后自动作废旧快照
+    const cacheKey = new Request(upstream + '&__cfgv=2', { method: 'GET' });
     const now = Math.floor(Date.now() / 1000);
     const cached = await caches.default.match(cacheKey);
     const storedAt = cached ? (parseInt(cached.headers.get('X-Stored-At') || '0', 10) || 0) : 0;
@@ -2019,7 +2047,8 @@ async function handleFinalRequest(request, env, ctx) {
     for (let attempt = 0; attempt < 2 && !upstreamResp; attempt++) {
         try {
             const r = await fetch(upstream, {
-                headers: { 'User-Agent': request.headers.get('User-Agent') || 'clash.meta' }
+                headers: { 'User-Agent': request.headers.get('User-Agent') || 'clash.meta' },
+                signal: AbortSignal.timeout(30000)
             });
             if (r.ok || r.status < 500) {
                 upstreamResp = r;
@@ -2027,21 +2056,32 @@ async function handleFinalRequest(request, env, ctx) {
         } catch (e) { }
     }
     if (upstreamResp && upstreamResp.ok) {
-        const body = await upstreamResp.arrayBuffer();
-        ctx.waitUntil(caches.default.put(cacheKey, new Response(body, {
-            headers: {
-                'Content-Type': 'text/plain; charset=utf-8',
-                'Cache-Control': 'public, max-age=' + STALE_SEC,
-                'X-Stored-At': String(now)
-            }
-        })));
-        return new Response(body, {
-            headers: {
-                'Content-Type': 'text/plain; charset=utf-8',
-                'Cache-Control': 'public, max-age=600',
-                'X-Final-Cache': 'MISS'
-            }
-        });
+        let body = null;
+        try {
+            body = await upstreamResp.arrayBuffer();
+        } catch (e) {
+            body = null;
+        }
+        // 上游抖动时会返回截断的 200（Content-Length 也可能一致）：校验不过就当作失败
+        if (!looksCompleteSubscription(body, qs.get('target'))) {
+            body = null;
+            upstreamResp = null;
+        } else {
+            ctx.waitUntil(caches.default.put(cacheKey, new Response(body, {
+                headers: {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Cache-Control': 'public, max-age=' + STALE_SEC,
+                    'X-Stored-At': String(now)
+                }
+            })));
+            return new Response(body, {
+                headers: {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Cache-Control': 'public, max-age=600',
+                    'X-Final-Cache': 'MISS'
+                }
+            });
+        }
     }
     if (upstreamResp) {
         return new Response(upstreamResp.body, {
