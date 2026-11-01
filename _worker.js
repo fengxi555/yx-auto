@@ -1652,7 +1652,7 @@ function generateHomePage(scuValue) {
 
             <div class="form-group">
                 <label>中转地址（可选）</label>
-                <input type="text" id="relayBase" placeholder="留空则直连本站；例如 http://172.245.71.111:2082">
+                <input type="text" id="relayBase" placeholder="留空则直连本站；格式 http://你的VPS:端口">
                 <small style="display: block; margin-top: 6px; color: #86868b; font-size: 13px;">填写 VPS 反代地址后，生成的订阅链接改从该地址拉取（仅 CLASH/SING-BOX 等经 /final 的客户端生效）</small>
             </div>
             
