@@ -1898,7 +1898,8 @@ function generateHomePage(scuValue) {
             
             const currentUrl = new URL(window.location.href);
             const baseUrl = currentUrl.origin;
-            const relayBase = ((document.getElementById('relayBase') || {}).value || '').trim().replace(/\/+$/, '');
+            let relayBase = ((document.getElementById('relayBase') || {}).value || '').trim();
+            while (relayBase.slice(-1) === '/') relayBase = relayBase.slice(0, -1);
             const outputBase = relayBase || baseUrl;
             const CFG_FILE_MAP = { '__noauto__': 'clash-rules-noauto.ini', '__adblock__': 'clash-rules.ini', '__sony__': 'clash-rules-sony.ini', '__nodefault__': 'clash-rules-default.ini' };
             const effectiveRemote = CFG_FILE_MAP[remoteConfig] ? baseUrl + '/' + uuid + '/' + CFG_FILE_MAP[remoteConfig] : remoteConfig;
